@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    /* padding */
+    .section-padding {
+        @apply relative px-6 py-10 mx-auto sm:px-16 sm:py-16 max-w-7xl;
+    }
+    .section-padding-x {
+        @apply px-6 mx-auto sm:px-16 max-w-7xl;
+    }
+    .section-padding-y {
+        @apply py-6 mx-auto sm:py-16 max-w-7xl;
+    }
+
+    /* text */
+    .heroHeadText {
+        @apply font-black lg:text-[70px] md:text-[60px] sm:text-[50px] text-[40px];
+    }
+    .heroP {
+        @apply font-normal lg:text-[20px] sm:text-[18px] xs:text-[16px] text-[14px] leading-[25px] sm:leading-[30px] lg:leading-[35px];
+    }
+    .sectionHeadText {
+        @apply font-black md:text-[40px] sm:text-[35px] xs:text-[30px] text-[25px];
+    }
+    .sectionP {
+        @apply lg:text-[16px] md:text-[14px] text-[12px] sm:leading-7 leading-5 lg:leading-8;
+    }
+    .sectionSmallText {
+        @apply lg:text-[12px] md:text-[11px] sm:text-[10px] text-[8px] leading-4 md:leading-5;
+    }
+    /* heading */
+    h1 {
+        @apply font-black lg:text-[52px] md:text-[44px] sm:text-[36px] text-[28px];
+    }
+    h3 {
+        @apply font-black lg:text-[40px] md:text-[32px] sm:text-[24px] text-[18px];
+    }
+    h6 {
+        @apply font-black lg:text-[20px] md:text-[18px] sm:text-[16px] text-[12px];
+    }
+
+    .tab:is(input[type="radio"]):after {
+        @apply w-[100px] !important;
+    }
+
+    input{
+        @apply focus:outline-none focus-visible:outline-none focus:ring-transparent  !important
+    }
+    input[type="radio"]:checked + label {
+        @apply text-yellow-400;
+    }
+}
+

@@ -19,11 +19,11 @@ class CommentFactory extends Factory
     public function definition(): array
     {
         return [
-            'message' => fake()->text(),
+            'message' => fake()->text(150),
             'rating' => fake()->numberBetween(1, 5),
             'is_active' => true,
-            'user_id' => User::factory()->create()->id,
-            'product_id' => Product::factory()->create()->id,
+            'user_id' => User::factory(),
+            'product_id' => Product::factory(),
         ];
     }
 }

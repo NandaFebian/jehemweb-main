@@ -2,41 +2,55 @@
 
 namespace Database\Seeders;
 
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-
 use App\Enums\Role;
+use App\Models\Category;
+use App\Models\Comment;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
+/**
+ * Local development data. Every account uses the password "password*123".
+ *   - 123 : super admin
+ *   - 678 : admin
+ *   - 345 : shop owner (user)
+ */
 class DevSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        $superadmin = User::create([
-            'phone_number' => '123',
-            'name' => 'Super Admin',
-            'password' => bcrypt('password*123'),
-            'is_active' => true,
-        ]);
-        $admin = User::create([
-            'phone_number' => '678',
-            'name' => 'Super Admin',
-            'password' => bcrypt('password*123'),
-            'is_active' => true,
-        ]);
+        $this->call(RoleSeeder::class);
 
-        $user = User::create([
-            'phone_number' => '345',
-            'name' => 'User',
-            'password' => bcrypt('password*123'),
-            'is_active' => true,
-        ]);
+        $accounts = [
+            ['phone_number' => '123', 'name' => 'Super Admin', 'role' => Role::SUPER_ADMIN],
+            ['phone_number' => '678', 'name' => 'Admin', 'role' => Role::ADMIN],
+            ['phone_number' => '345', 'name' => 'User', 'role' => Role::USER],
+        ];
 
-        $superadmin->assignRole(Role::SUPER_ADMIN->value);
-        $admin->assignRole(Role::ADMIN->value);
-        $user->assignRole(Role::USER->value);
+        foreach ($accounts as $account) {
+            $user = User::firstOrCreate(
+                ['phone_number' => $account['phone_number']],
+                ['name' => $account['name'], 'password' => Hash::make('password*123'), 'is_active' => true],
+            );
+            $user->syncRoles([$account['role']->value]);
+        }
+
+        if (Product::query()->exists()) {
+            return;
+        }
+
+        $categories = collect(['Kerajinan', 'Peternakan', 'Pertanian', 'Jasa'])
+            ->map(fn (string $name) => Category::create(['name' => $name]));
+
+        Product::factory()
+            ->count(8)
+            ->approved()
+            ->create()
+            ->each(function (Product $product) use ($categories) {
+                $product->categories()->attach($categories->random());
+                $product->user->assignRole(Role::USER->value);
+                Comment::factory()->count(2)->for($product)->create();
+            });
     }
 }

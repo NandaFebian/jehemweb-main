@@ -15,10 +15,9 @@ class CreateProduct extends CreateRecord
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        if (!isset($data['selected_user_id']) || is_null($data['selected_user_id'])) {
-            $data['user_id'] = auth()->user()->id;
-        } else {
-            $data['user_id'] = $data['selected_user_id'];
+        // The owner select is only shown to admins; everyone else creates products for themselves.
+        if (! ProductResource::isAdmin() || empty($data['user_id'])) {
+            $data['user_id'] = auth()->id();
         }
 
         return $data;

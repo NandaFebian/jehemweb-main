@@ -16,17 +16,4 @@ class EditProduct extends EditRecord
             Actions\DeleteAction::make(),
         ];
     }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    protected function mutateFormDataBeforeSave(array $data): array
-    {
-        if (isset($data['selected_user_id']) && !is_null($data['selected_user_id'])) {
-            $data['user_id'] = $data['selected_user_id'];
-        }
-
-        return $data;
-    }
 }

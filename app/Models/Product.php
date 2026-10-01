@@ -2,9 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\AttachmentType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Product extends Model
 {
@@ -33,19 +38,17 @@ class Product extends Model
      */
     protected $casts = [
         'contacts' => 'array',
+        'is_active' => 'boolean',
         'is_approved' => 'boolean',
+        'visitor_count' => 'integer',
     ];
 
-    protected $appends = [
-        'avg_rating',
-    ];
-
-    public function attachments()
+    public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachmentable');
     }
 
-    public function categories()
+    public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class, 'product_category');
     }
@@ -55,23 +58,39 @@ class Product extends Model
         return $this->hasMany(Comment::class);
     }
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Products that are visible on the public site (approved by an admin and activated by the owner).
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query->where('is_approved', true)->where('is_active', true);
+    }
+
+    /**
+     * Average rating, using the `withAvg('comments', 'rating')` aggregate when it was eager loaded.
+     */
     public function getAvgRatingAttribute(): float
     {
-        $count = $this->comments->count();
-        if (! $count) {
-            return 0;
-        }
+        $average = array_key_exists('comments_avg_rating', $this->attributes)
+            ? $this->attributes['comments_avg_rating']
+            : $this->comments()->avg('rating');
 
-        $total = 0;
-        foreach ($this->comments as $comment) {
-            $total += $comment->rating;
-        }
+        return round((float) $average, 1);
+    }
 
-        return $total / $count;
+    /**
+     * URL of the first image attachment, or a placeholder.
+     */
+    public function getCoverUrlAttribute(): string
+    {
+        $image = $this->attachments->firstWhere('type', AttachmentType::IMAGE->value)
+            ?? $this->attachments->first();
+
+        return $image?->url ?? asset('images/unknown-product.webp');
     }
 }

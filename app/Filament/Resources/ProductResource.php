@@ -4,11 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Enums\AttachmentType;
 use App\Enums\ContactPlatform;
-use App\Enums\Role;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
-use App\Models\User;
-use Filament\Forms;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
@@ -28,7 +25,7 @@ class ProductResource extends Resource
 {
     protected static ?string $model = Product::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
 
     public static function form(Form $form): Form
     {
@@ -48,11 +45,10 @@ class ProductResource extends Resource
                             ->label('Deskripsi')
                             ->columnSpanFull()
                             ->maxLength(255),
-                        TextArea::make('important_information')
+                        Textarea::make('important_information')
                             ->label('Informasi Penting')
                             ->columnSpanFull()
                             ->maxLength(255),
-
                         Select::make('categories')
                             ->label('Kategori')
                             ->relationship('categories', 'name')
@@ -60,22 +56,29 @@ class ProductResource extends Resource
                             ->optionsLimit(10)
                             ->multiple()
                             ->columnSpanFull(),
-                        Select::make('selected_user_id')
-                            ->hidden(auth()->user()->hasRole(Role::USER))
-                            ->relationship('user', 'name'),
+                        // Admins may create a product on behalf of a shop owner; owners always own their products.
+                        Select::make('user_id')
+                            ->label('Pemilik')
+                            ->relationship('user', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->default(fn () => auth()->id())
+                            ->required()
+                            ->visible(fn () => self::isAdmin()),
                     ]),
                 Section::make()
                     ->schema([
-                        Forms\Components\Repeater::make('contacts')
+                        Repeater::make('contacts')
+                            ->label('Kontak')
                             ->schema([
                                 Select::make('platform')
                                     ->label('Platform')
                                     ->options(ContactPlatform::option())
                                     ->required(),
                                 TextInput::make('url')
-                                    ->label('URL')
+                                    ->label('URL / Nomor')
                                     ->required()
-                                    ->required(),
+                                    ->maxLength(255),
                             ])
                             ->minItems(1)
                             ->columnSpanFull(),
@@ -83,38 +86,40 @@ class ProductResource extends Resource
                 Section::make()
                     ->schema([
                         Repeater::make('attachments')
+                            ->label('Foto / Video')
                             ->relationship()
                             ->schema([
                                 Select::make('type')
                                     ->label('Tipe File')
                                     ->options(AttachmentType::option())
+                                    ->default(AttachmentType::IMAGE->value)
                                     ->required(),
                                 TextInput::make('name')
                                     ->label('Nama file')
-                                    ->required(),
+                                    ->required()
+                                    ->maxLength(255),
                                 FileUpload::make('path')
                                     ->label('File')
+                                    ->disk('public')
+                                    ->directory('products')
+                                    ->acceptedFileTypes(['image/*', 'video/*'])
+                                    ->maxSize(20 * 1024)
                                     ->previewable()
                                     ->required(),
                             ])
                             ->columnSpanFull()
                             ->minItems(1),
                     ]),
-
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(function (Builder $query) {
-                if (!self::isAdmin()) {
-                    return $query->where('user_id', auth()->user()->id);
-                }
-            })
+            ->modifyQueryUsing(fn (Builder $query) => self::isAdmin() ? $query : $query->whereBelongsTo(auth()->user()))
             ->columns([
                 Tables\Columns\TextColumn::make('user.name')
-                    ->numeric()
+                    ->label('Pemilik')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
@@ -134,32 +139,21 @@ class ProductResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                //
-            ])
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Action::make('approve')
                     ->color('success')
-                    ->action(function (Model $record) {
-                        $record->is_approved = true;
-                        $record->save();
-                    })
-                    ->hidden(fn (Model $record) => $record->is_approved || !self::isAdmin()),
+                    ->requiresConfirmation()
+                    ->action(fn (Product $record) => $record->update(['is_approved' => true]))
+                    ->hidden(fn (Product $record) => $record->is_approved || ! self::isAdmin()),
                 Action::make('activate')
                     ->color('success')
-                    ->action(function (Model $record) {
-                        $record->is_active = true;
-                        $record->save();
-                    })
-                    ->hidden(fn (Model $record) => $record->is_active || self::isAdmin()),
+                    ->action(fn (Product $record) => $record->update(['is_active' => true]))
+                    ->hidden(fn (Product $record) => $record->is_active || self::isAdmin()),
                 Action::make('inactivate')
                     ->color('danger')
-                    ->action(function (Model $record) {
-                        $record->is_active = false;
-                        $record->save();
-                    })
-                    ->hidden(fn (Model $record) => !$record->is_active || self::isAdmin()),
+                    ->action(fn (Product $record) => $record->update(['is_active' => false]))
+                    ->hidden(fn (Product $record) => ! $record->is_active || self::isAdmin()),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -186,30 +180,30 @@ class ProductResource extends Resource
 
     public static function isAdmin(): bool
     {
-        $user = User::findOrFail(auth()->user()->id);
-
-        return $user->hasRole(Role::ADMIN->value) || $user->hasRole(Role::SUPER_ADMIN->value);
+        return (bool) auth()->user()?->isAdmin();
     }
 
     public static function canEdit(Model $record): bool
     {
+        return self::isAdmin() || $record->user_id === auth()->id();
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return self::canEdit($record);
+    }
+
+    /**
+     * Admins can always create products; a shop owner needs an activated account and may own one product.
+     */
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
         if (self::isAdmin()) {
             return true;
         }
 
-        return $record->user_id == auth()->user()->id;
-    }
-
-    public static function canCreate(): bool
-    {
-        if (!auth()->user()->is_active) {
-            return false;
-        }
-
-        if (!auth()->user()->hasRole(Role::USER)) {
-            return true;
-        }
-
-        return Product::query()->where('user_id', auth()->user()->id)->count() < 1;
+        return $user->is_active && ! $user->products()->exists();
     }
 }

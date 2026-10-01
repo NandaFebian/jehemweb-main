@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -42,15 +43,16 @@ class Handler extends ExceptionHandler
      */
     public function register(): void
     {
-        $this->renderable(function (Throwable $e) {
-            if ($e instanceof ValidationException) {
-                return api_response($e->status, [], $e->getMessage());
+        // Only API requests get the JSON envelope; web forms and Filament keep Laravel's default handling.
+        $this->renderable(function (ValidationException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'status_code' => $e->status,
+                    'data' => [],
+                    'message' => $e->getMessage(),
+                    'errors' => $e->errors(),
+                ], $e->status);
             }
-
-            if ($e instanceof UserPhoneExistException) {
-                return api_response($e->status, [], 'Nomor Telepon Tidak Tersedia, Silahkan Coba Yang Lain.');
-            }
-
         });
     }
 }

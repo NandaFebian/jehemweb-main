@@ -1,10 +1,10 @@
 <?php
 
-use App\Filament\Pages\AboutPage;
-use App\Filament\Pages\ContactPage;
-use App\Filament\Pages\DetailPage;
-use App\Filament\Pages\HomePage;
-use App\Filament\Pages\RegisterPage;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\PageController;
+use App\Http\Controllers\ProductCommentController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\RegisteredUserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -12,15 +12,22 @@ use Illuminate\Support\Facades\Route;
 | Web Routes
 |--------------------------------------------------------------------------
 |
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
+| Public Jehem Meadolan site. Shop owners and admins manage data from the
+| Filament panel at /admin (see App\Providers\Filament\AdminPanelProvider).
 |
 */
 
-// jehem meadolan
-Route::get('/', HomePage::class)->name('home');
-Route::get('/about', AboutPage::class)->name('about');
-Route::get('/contact', ContactPage::class)->name('contact');
-Route::get('/detail-product/{id}', DetailPage::class)->name('detail');
-Route::get('/register', RegisterPage::class)->name('register');
+Route::get('/', HomeController::class)->name('home');
+Route::get('/about', [PageController::class, 'about'])->name('about');
+Route::get('/contact', [PageController::class, 'contact'])->name('contact');
+
+Route::get('/detail-product/{id}', [ProductController::class, 'show'])->whereNumber('id')->name('products.show');
+Route::post('/detail-product/{id}/comments', [ProductCommentController::class, 'store'])
+    ->whereNumber('id')
+    ->middleware(['auth', 'throttle:10,1'])
+    ->name('products.comments.store');
+
+Route::middleware('guest')->group(function () {
+    Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
+    Route::post('/register', [RegisteredUserController::class, 'store'])->middleware('throttle:5,1')->name('register.store');
+});

@@ -2,10 +2,8 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\Role;
 use App\Filament\Resources\CategoryResource\Pages;
 use App\Models\Category;
-use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -68,8 +66,6 @@ class CategoryResource extends Resource
 
     public static function canViewAny(): bool
     {
-        $user = User::findOrFail(auth()->user()->id);
-
-        return $user->hasRole(Role::ADMIN->value) || $user->hasRole(Role::SUPER_ADMIN->value);
+        return auth()->user()->isAdmin();
     }
 }

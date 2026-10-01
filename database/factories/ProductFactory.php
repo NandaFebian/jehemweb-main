@@ -19,18 +19,27 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
-            'description' => fake()->text(),
-            'important_information' => fake()->text(),
+            'name' => ucwords(fake()->words(3, true)),
+            'description' => fake()->text(200),
+            'important_information' => fake()->text(200),
             'visitor_count' => fake()->numberBetween(1, 10000),
             'contacts' => [
                 [
                     'platform' => ContactPlatform::INSTAGRAM->value,
-                    'url' => 'https:/instagram.com/nanda_amanta',
+                    'url' => 'https://instagram.com/jehemmeadolan',
                 ],
             ],
-            'user_id' => User::factory()->create()->id,
+            'user_id' => User::factory(),
             'is_active' => true,
+            'is_approved' => false,
         ];
+    }
+
+    /**
+     * A product that has been approved by an admin and is visible on the public site.
+     */
+    public function approved(): static
+    {
+        return $this->state(fn () => ['is_approved' => true]);
     }
 }

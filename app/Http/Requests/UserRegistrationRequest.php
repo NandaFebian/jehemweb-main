@@ -22,9 +22,32 @@ class UserRegistrationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string'],
-            'phone_number' => ['required', 'string'],
-            'password' => ['required', 'string'],
+            'name' => ['required', 'string', 'max:255'],
+            'phone_number' => ['required', 'string', 'max:20', 'regex:/^\+?[0-9]{6,20}$/', 'unique:users,phone_number'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'phone_number.unique' => 'Nomor telepon sudah terdaftar, silahkan gunakan nomor lain.',
+            'phone_number.regex' => 'Nomor telepon hanya boleh berisi angka.',
+            'password.confirmed' => 'Konfirmasi password tidak sama dengan password.',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'name' => 'nama usaha',
+            'phone_number' => 'nomor telepon',
         ];
     }
 }

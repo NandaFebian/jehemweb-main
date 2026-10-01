@@ -2,26 +2,34 @@
 
 namespace Database\Seeders;
 
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-
 use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 class ProdSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
+     * Create (or reset) the super admin from the SUPER_ADMIN_PHONE / SUPER_ADMIN_PASSWORD env values.
      */
     public function run(): void
     {
-        User::role(Role::SUPER_ADMIN->value)->delete();
-        $superadmin = User::create([
-            'phone_number' => config('auth.super_admin.phone_number'),
-            'name' => 'Super Admin',
-            'password' => bcrypt(config('auth.super_admin.password')),
-            'is_active' => true,
-        ]);
-        $superadmin->assignRole(Role::SUPER_ADMIN->value);
+        $phone = config('auth.super_admin.phone_number');
+        $password = config('auth.super_admin.password');
+
+        if (blank($phone) || blank($password)) {
+            throw new RuntimeException('Set SUPER_ADMIN_PHONE and SUPER_ADMIN_PASSWORD in .env before running ProdSeeder.');
+        }
+
+        $this->call(RoleSeeder::class);
+
+        User::role(Role::SUPER_ADMIN->value)->where('phone_number', '!=', $phone)->delete();
+
+        $superadmin = User::updateOrCreate(
+            ['phone_number' => $phone],
+            ['name' => 'Super Admin', 'password' => Hash::make($password), 'is_active' => true],
+        );
+        $superadmin->syncRoles([Role::SUPER_ADMIN->value]);
     }
 }

@@ -3,31 +3,23 @@
 namespace App\Services;
 
 use App\Enums\Role;
-use App\Exceptions\UserPhoneExistException;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class AuthService
 {
-    public function __construct(protected User $model)
+    /**
+     * Register a shop owner. The account stays inactive until an admin activates it.
+     *
+     * @param  array{name: string, phone_number: string, password: string}  $data
+     */
+    public function register(array $data): User
     {
-    }
-
-    public function register(array $data = []): User
-    {
-        $checkPhoneNumber = User::query()
-            ->where('phone_number', $data['phone_number'])
-            ->where('is_active', true)
-            ->first();
-
-        if ($checkPhoneNumber) {
-            throw new UserPhoneExistException();
-        }
-
         $user = User::create([
             'name' => $data['name'],
             'phone_number' => $data['phone_number'],
             'is_active' => false,
-            'password' => bcrypt($data['password']),
+            'password' => Hash::make($data['password']),
         ]);
         $user->assignRole(Role::USER->value);
 

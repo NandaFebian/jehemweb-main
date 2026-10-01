@@ -14,6 +14,8 @@ class AuthController extends Controller
 
     public function register(UserRegistrationRequest $request)
     {
-        return $this->service->register($request->validated());
+        $user = $this->service->register($request->validated());
+
+        return api_response(201, $user->toArray(), 'Registrasi berhasil, tunggu verifikasi admin.');
     }
 }

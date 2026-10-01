@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\VisitorResource\Widgets;
 
-use App\Enums\Role;
 use App\Services\VisitorService;
 use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
@@ -13,17 +12,9 @@ class VisitorWidgetChart extends ChartWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    private VisitorService $visitorService;
-
-    public function __construct()
-    {
-        $this->visitorService = new VisitorService();
-    }
-
     protected function getData(): array
     {
-        $date = Carbon::now();
-        $data = $this->visitorService->getDataGroupedByMonth($date->year);
+        $data = app(VisitorService::class)->getDataGroupedByMonth(Carbon::now()->year);
 
         return [
             'datasets' => [
@@ -43,6 +34,6 @@ class VisitorWidgetChart extends ChartWidget
 
     public static function canView(): bool
     {
-        return auth()->user()->hasRole(Role::ADMIN->value) || auth()->user()->hasRole(Role::SUPER_ADMIN->value);
+        return auth()->user()->isAdmin();
     }
 }

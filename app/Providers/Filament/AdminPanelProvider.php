@@ -3,10 +3,10 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
-use App\Filament\Pages\RegisterPage;
 use App\Filament\Resources\ProductResource\Widgets\ProductCountOverview;
 use App\Filament\Resources\ProductResource\Widgets\VisitorOverview;
 use App\Filament\Resources\VisitorResource\Widgets\VisitorWidgetChart;
+use App\Http\Controllers\RegisteredUserController;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -32,21 +32,21 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(Login::class)
+            // The public registration page is shared with the site, so the login screen links to it.
+            ->registration([RegisteredUserController::class, 'create'])
             ->colors([
                 'primary' => Color::Amber,
             ])
             ->navigationItems([
                 NavigationItem::make('Kembali ke beranda')
-                    ->url(config('app.url'), shouldOpenInNewTab: true)
+                    ->url(fn (): string => route('home'), shouldOpenInNewTab: true)
                     ->icon('heroicon-o-arrow-uturn-left')
-                    ->sort(3)
+                    ->sort(3),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 VisitorWidgetChart::class,
                 VisitorOverview::class,
@@ -63,8 +63,6 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-
-            ->registration(RegisterPage::class)
             ->authMiddleware([
                 Authenticate::class,
             ]);

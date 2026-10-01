@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\UserResource\Pages;
 
-use App\Enums\Role;
 use App\Filament\Resources\UserResource;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
@@ -18,18 +17,11 @@ class EditUser extends EditRecord
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    protected function mutateFormDataBeforeSave(array $data): array
+    protected function afterSave(): void
     {
-        if (isset($data['password']) && $data['password']) {
-            $data['password'] = bcrypt($data['password']);
-        } else {
-            unset($data['password']);
+        // The role field is only rendered for the super admin.
+        if (auth()->user()->isSuperAdmin() && filled($this->data['role'] ?? null)) {
+            $this->record->syncRoles([$this->data['role']]);
         }
-
-        return $data;
     }
 }

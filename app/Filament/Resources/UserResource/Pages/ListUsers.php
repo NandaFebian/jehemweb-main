@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\UserResource\Pages;
 
-use App\Enums\Role;
 use App\Filament\Resources\UserResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
@@ -14,7 +13,7 @@ class ListUsers extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make()->hidden(! auth()->user()->hasRole(Role::SUPER_ADMIN)),
+            Actions\CreateAction::make(),
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
@@ -10,6 +11,8 @@ use Illuminate\Support\Str;
  */
 class UserFactory extends Factory
 {
+    protected static ?string $password;
+
     /**
      * Define the model's default state.
      *
@@ -19,22 +22,18 @@ class UserFactory extends Factory
     {
         return [
             'name' => fake()->name(),
-            'phone_number' => fake()->phoneNumber(),
+            'phone_number' => fake()->unique()->numerify('08##########'),
             'is_active' => true,
-            'password' => bcrypt('password'), // password
+            'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
     }
 
     /**
-     * Indicate that the model's email address should be unverified.
-     *
-     * @return $this
+     * A freshly registered account that an admin has not activated yet.
      */
-    public function unverified(): static
+    public function inactive(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
+        return $this->state(fn () => ['is_active' => false]);
     }
 }

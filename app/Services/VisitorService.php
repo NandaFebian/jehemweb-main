@@ -3,11 +3,11 @@
 namespace App\Services;
 
 use App\Models\Visitor;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 class VisitorService
 {
-    private $months = [
+    private const MONTHS = [
         1 => 'Januari',
         2 => 'Februari',
         3 => 'Maret',
@@ -22,41 +22,37 @@ class VisitorService
         12 => 'Desember',
     ];
 
-    public function updateCountVisitor(int $date, int $month, int $year)
+    /**
+     * Count one visit for the given day (today by default).
+     */
+    public function recordVisit(?Carbon $date = null): void
     {
-        $visitor = Visitor::query()
-            ->where('date', $date)
-            ->where('month', $month)
-            ->where('year', $year)
-            ->first();
+        $date ??= Carbon::now();
 
-        if (! $visitor) {
-            $visitor = Visitor::create([
-                'date' => $date,
-                'month' => $month,
-                'year' => $year,
-                'count' => 1,
-            ]);
-        }
-
-        $visitor->update(['count' => $visitor->count + 1]);
+        Visitor::query()
+            ->firstOrCreate(
+                ['date' => $date->day, 'month' => $date->month, 'year' => $date->year],
+                ['count' => 0],
+            )
+            ->increment('count');
     }
 
-    public function getDataGroupedByMonth(int $year)
+    /**
+     * Total visits per month of the given year, keyed by (Indonesian) month name.
+     *
+     * @return array<string, int>
+     */
+    public function getDataGroupedByMonth(int $year): array
     {
-
-        // Inisialisasi array untuk hasil kunjungan per bulan
-        $visitsPerMonth = array_fill_keys(array_values($this->months), 0);
-
-        // Query untuk mendapatkan jumlah kunjungan per bulan
-        $results = Visitor::select(DB::raw('SUM(count) as total_visits, month'))
+        $totals = Visitor::query()
             ->where('year', $year)
             ->groupBy('month')
-            ->orderBy('month')
-            ->get();
+            ->selectRaw('month, SUM(count) as total_visits')
+            ->pluck('total_visits', 'month');
 
-        foreach ($results as $result) {
-            $visitsPerMonth[$this->months[$result->month]] = $result->total_visits;
+        $visitsPerMonth = [];
+        foreach (self::MONTHS as $number => $name) {
+            $visitsPerMonth[$name] = (int) ($totals[$number] ?? 0);
         }
 
         return $visitsPerMonth;

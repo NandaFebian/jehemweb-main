@@ -14,12 +14,13 @@ use Filament\Tables\Actions\Action;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-users';
 
     public static function form(Form $form): Form
     {
@@ -32,48 +33,45 @@ class UserResource extends Resource
                 Forms\Components\TextInput::make('phone_number')
                     ->tel()
                     ->required()
-                    ->maxLength(255),
+                    ->unique(ignoreRecord: true)
+                    ->maxLength(20),
 
                 Forms\Components\TextInput::make('password')
-                    ->required(fn (string $operation) => $operation == 'create')
-                    ->hidden(!auth()->user()->hasRole(Role::SUPER_ADMIN))
+                    ->password()
+                    ->required(fn (string $operation) => $operation === 'create')
+                    ->dehydrated(fn (?string $state) => filled($state))
+                    ->dehydrateStateUsing(fn (string $state) => Hash::make($state))
+                    ->visible(fn () => self::currentUser()->isSuperAdmin())
                     ->maxLength(255),
 
+                // Not a model attribute: synced to spatie roles by the Create/Edit pages.
                 Select::make('role')
                     ->options([
                         Role::ADMIN->value => 'Admin',
                         Role::USER->value => 'User',
                     ])
                     ->required()
-                    ->hidden(!auth()->user()->hasRole(Role::SUPER_ADMIN))
-                    ->formatStateUsing(fn ($record) => is_null($record) ? null : $record->roles->first()->name),
+                    ->visible(fn () => self::currentUser()->isSuperAdmin())
+                    ->formatStateUsing(fn (?User $record) => $record?->roles->first()?->name),
+
                 Forms\Components\Toggle::make('is_active')
                     ->required()
-                    ->hidden(auth()->user()->hasRole(Role::USER)),
+                    ->visible(fn () => self::currentUser()->isAdmin()),
+
                 Forms\Components\FileUpload::make('profile_image_path')
+                    ->label('Foto profil')
+                    ->disk('public')
+                    ->directory('profiles')
                     ->image(),
             ]);
-    }
-
-    public static function canEdit(Model $record): bool
-    {
-        if (auth()->user()->hasRole(Role::USER) || auth()->user()->hasRole(Role::ADMIN)) {
-            return static::canViewAny() && auth()->user()->id === $record->id;
-        }
-
-        return static::canViewAny();
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(function (Builder $query) {
-                if (auth()->user()->hasRole(Role::USER)) {
-                    return $query->where('id', auth()->user()->id);
-                }
-
-                return $query;
-            })
+            ->modifyQueryUsing(fn (Builder $query) => self::currentUser()->isAdmin()
+                ? $query->with('roles')
+                : $query->whereKey(auth()->id()))
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
@@ -82,7 +80,7 @@ class UserResource extends Resource
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean(),
                 Tables\Columns\TextColumn::make('role')
-                    ->getStateUsing(fn ($record) => $record->roles->first()->name ?? null)
+                    ->getStateUsing(fn (User $record) => $record->roles->first()?->name)
                     ->default('-'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -93,29 +91,22 @@ class UserResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                //
-            ])
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Action::make('activate')
                     ->color('success')
-                    ->action(function (Model $record) {
-                        $record->is_active = true;
-                        $record->save();
-                    })
-                    ->hidden(fn (Model $record) => $record->is_active || auth()->user()->hasRole(Role::USER)),
+                    ->action(fn (User $record) => $record->update(['is_active' => true]))
+                    ->hidden(fn (User $record) => $record->is_active || ! self::currentUser()->isAdmin()),
                 Action::make('inactivate')
                     ->color('danger')
-                    ->action(function (Model $record) {
-                        $record->is_active = false;
-                        $record->save();
-                    })
-                    ->hidden(fn (Model $record) => !$record->is_active || auth()->user()->hasRole(Role::USER)),
+                    ->requiresConfirmation()
+                    ->action(fn (User $record) => $record->update(['is_active' => false]))
+                    ->hidden(fn (User $record) => ! $record->is_active || ! self::currentUser()->isAdmin() || $record->is(auth()->user())),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn () => self::currentUser()->isSuperAdmin()),
                 ]),
             ]);
     }
@@ -127,9 +118,22 @@ class UserResource extends Resource
         ];
     }
 
+    public static function canCreate(): bool
+    {
+        return self::currentUser()->isSuperAdmin();
+    }
+
+    /**
+     * The super admin can edit anyone; everybody else can only edit their own profile.
+     */
+    public static function canEdit(Model $record): bool
+    {
+        return self::currentUser()->isSuperAdmin() || $record->is(auth()->user());
+    }
+
     public static function canDelete(Model $record): bool
     {
-        return auth()->user()->hasRole(Role::SUPER_ADMIN);
+        return self::currentUser()->isSuperAdmin() && ! $record->is(auth()->user());
     }
 
     public static function getPages(): array
@@ -139,5 +143,10 @@ class UserResource extends Resource
             'create' => Pages\CreateUser::route('/create'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
+    }
+
+    private static function currentUser(): User
+    {
+        return auth()->user();
     }
 }

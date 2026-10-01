@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use Filament\Facades\Filament;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CommentCreationRequest extends FormRequest
@@ -12,7 +11,7 @@ class CommentCreationRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return Filament::auth()->check();
+        return $this->user() !== null;
     }
 
     /**
@@ -23,9 +22,18 @@ class CommentCreationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'rating' => ['required', 'numeric', 'max:5', 'min:1'],
+            'rating' => ['required', 'integer', 'between:1,5'],
             'message' => ['required', 'string', 'max:250'],
-            'product_id' => ['required'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'message' => 'komentar',
         ];
     }
 }
